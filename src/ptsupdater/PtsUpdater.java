@@ -145,12 +145,18 @@ public class PtsUpdater {
     }
   }
 
-  public void bringNewCurrent() {
-    //rpc - NOTE HERE:4/13/10 6:13 PM - Is fixed, try was killing socket, had to go outside for loop
-    //symList = PtsUpdaterDBops.SymbolsMaxDateLastExpiryList();
-    updateExchanges();
+  public void bringNewCurrent(int beforeE, int AfterE, int daysBefore) {
+    //3/15/11 4:04 PM Need to get the symList differently, have it set the new syms
+    symList = PtsUpdaterDBops.SymbolsExpirysBetweemDatesList(beforeE, AfterE);
     SymbolMaxDateLastExpiry sym = null;
-
+    Calendar calendar = Calendar.getInstance();
+    calendar.setTime(new Date());
+    calendar.add(Calendar.DATE, -daysBefore);
+    calendar.set(Calendar.HOUR, 0);
+    calendar.set(Calendar.MINUTE, 0);
+    for(SymbolMaxDateLastExpiry symIn : symList) {
+      symIn.maxDate = calendar.getTime();
+    }
     //2/4/11 1:35 PM Had a loop over symList.size(), caused that many full sets to download
     try {
         bringSymbolsCurrent(socket);
@@ -173,7 +179,18 @@ public class PtsUpdater {
   public static void main(String[] args) {
     PtsUpdater pts = new PtsUpdater();
     pts.getSocket().reqCurrentTime();
-    pts.bringAllCurrent();
+    if(args.length == 0) {
+      pts.bringAllCurrent();
+    } else if (args.length == 3) {
+      pts.bringNewCurrent(Integer.parseInt(args[0]), Integer.parseInt(args[1]), Integer.parseInt(args[2]));
+    }
+    else {
+      System.out.println("Wrong # of args ( 0 or 3 required)");
+      System.out.println("0 args to update,");
+      System.out.println("3 args before date of Expiry, after date of Expiry,");
+      System.out.println("and days back from today e.g. 20110400, 20110700, 7");
+      System.exit(1);
+    }
     System.out.println("Updates Finished.");
 
   }

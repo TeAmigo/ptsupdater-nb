@@ -85,6 +85,32 @@ public class PtsUpdaterDBops {
     }
   }
 
+    public static ArrayList<SymbolMaxDateLastExpiry> SymbolsExpirysBetweemDatesList(int beforeE, int afterE) {
+    CallableStatement callStmt = null;
+    ArrayList<SymbolMaxDateLastExpiry> retList = new ArrayList<SymbolMaxDateLastExpiry>();
+    try {
+      callStmt = PtsUpdaterDBops.setuptradesConnection().prepareCall(
+              "SELECT distinct symbol, expiry, exchange FROM futuresContractDetails where symbol in" +
+                            "(select distinct symbol FROM quotes1min) and " +
+                            "expiry >= " +  beforeE + " and expiry <= " + afterE +
+                            " order by symbol, expiry;",
+              ResultSet.TYPE_SCROLL_INSENSITIVE,
+              ResultSet.CONCUR_READ_ONLY);
+      ResultSet res = callStmt.executeQuery();
+      while(res.next()) {
+        SymbolMaxDateLastExpiry sme = new SymbolMaxDateLastExpiry();
+        sme.symbol = res.getString("symbol");
+        sme.lastExpiry = res.getInt("expiry");
+        sme.exchange = res.getString("exchange");
+        retList.add(sme);
+      }
+    } catch (SQLException ex) {
+      System.err.println("SQLException  in distinctSymbolMaxDateLastExpiryList(): " + ex.getMessage());
+    } finally {
+      return retList;
+    }
+  }
+
 
   public static CallableStatement datedRangeBySymbol(String sym, Timestamp beginDate, Timestamp endDate) {
     CallableStatement ret = null;
