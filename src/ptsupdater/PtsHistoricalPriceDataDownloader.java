@@ -3,22 +3,15 @@ package ptsupdater;
 import com.ib.client.*;
 import java.io.*;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 
 import java.text.*;
 import java.util.*;
-import javax.swing.JTable;
-//import petrasys.ContinuousContractDlg;
-//import petrasys.PeTraSys;
-//import petrasys.entities.FuturesContractDetails;
-//import petrasys.utils.BarSize;
-//import petrasys.utils.MsgBox;
-//import petrasys.instruments.PriceBar;
-//import petrasys.instruments.QuoteHistory;
-//import petrasys.utils.ContractFactory;
-//import petrasys.utils.DBops;
+import org.joda.time.DateTime;
+import org.joda.time.Days;
+import org.joda.time.Hours;
+import org.joda.time.Seconds;
 
 /**
  *
@@ -36,14 +29,10 @@ public class PtsHistoricalPriceDataDownloader implements Runnable {
   private static final int MAX_REQUEST_FREQUENCY_MILLIS = 10100;
   private static final String lineSep = System.getProperty("line.separator");
   private int tickerId;
-  //private Trader trader;
-  //private Report eventReport;
   private String fileName;
   private PtsBarSize barSize;
   private PtsQuoteHistory quoteHistory;
   private List<PtsPriceBar> priceBars;
-  //private BackDataDialog backDataDialog;
-  //private ContinuousContractDlg ccdlg;
   private Contract contract;
   private PrintWriter writer;
   private boolean rthOnly;
@@ -56,31 +45,7 @@ public class PtsHistoricalPriceDataDownloader implements Runnable {
   private long lastRequestTime;
   private PtsHistoricalFromTWS histFromTWS;
   private boolean guard;
-  //FuturesContractDetails fcd;
-  //List<petrasys.entities.FuturesContractDetails> futuresContractDetailsList;
   ArrayList<SymbolMaxDateLastExpiry> ContractInfoTable;
-
-//  public PtsHistoricalPriceDataDownloader(ContinuousContractDlg ccdlg,
-//          List<FuturesContractDetails> futuresContractDetailsList, JTable ContractInfoTable) {
-//    //this.ccdlg = ccdlg;
-//    //this.fcd = fcd;
-//    //this.futuresContractDetailsList = futuresContractDetailsList;
-//    this.ContractInfoTable = ContractInfoTable;
-//    histFromTWS = new PtsHistoricalFromTWS();
-//    quoteHistory = new PtsQuoteHistory();
-//  }
-//
-//  public PtsHistoricalPriceDataDownloader(PtsHistoricalFromTWS histFrom) {
-//    try {
-//      quoteHistory = new PtsQuoteHistory();
-//      histFromTWS = histFrom;
-//      //ccdlg = null;
-//      connect();
-//      int i = 1;
-//    } catch (Exception ex) {
-//      System.err.println("Exception in PtsHistoricalPriceDataDownloader: " + ex.getMessage());
-//    }
-//  }
 
   public PtsHistoricalPriceDataDownloader(PtsHistoricalFromTWS histFrom, PtsMySocket socket,
           ArrayList<SymbolMaxDateLastExpiry> symList) {
@@ -132,12 +97,6 @@ public class PtsHistoricalPriceDataDownloader implements Runnable {
     this.quoteHistory = qh;
   }
 
-//  public void connect() {
-//    if (!socket.isConnected()) {
-//      socket = PtsIBConnectionManager.connect(histFromTWS);
-//    }
-//  }
-
   public void setupDownloader(Contract contract, Calendar startDate, Calendar endDate, PtsBarSize barSize) {
     this.barSize = barSize;
     this.rthOnly = false;
@@ -145,13 +104,24 @@ public class PtsHistoricalPriceDataDownloader implements Runnable {
     tickerId = contract.m_conId;
     priceBars = new ArrayList<PtsPriceBar>();
     firstDate = startDate;
+    //Date fd = startDate.getTime();
     lastDate = endDate;
     contract.m_includeExpired = true;
   }
 
-  public void reqHistoricalData(int strategyId, Contract contract, String endDateTime, String duration,
+  public void reqHistoricalData(int strategyId, Contract contract, Calendar calEndTime, String duration,
           String barSize, String whatToShow, int useRTH, int formatDate) throws InterruptedException {
+    DateTime dtEnd = new DateTime(calEndTime);
+    DateTime dtBegin = new DateTime(firstDate);
+    Hours h = Hours.hoursBetween(dtBegin, dtEnd);
+    if(h.getHours() < 24) {
+      duration = Integer.toString(h.getHours() * 3600);
+    } else {
+      int days = ((h.getHours() + 23) / 24) + 1;
+      duration = Integer.toString(days) + " D";
+    }
     //rpc - 3/2/10 8:12 AM - This is where the pacing is taken care of
+    String strEndTime = PtsDateOps.downloadFormat.format(calEndTime.getTime());
     try {
       long elapsedSinceLastRequest = System.currentTimeMillis() - lastRequestTime;
       long remainingTime = MAX_REQUEST_FREQUENCY_MILLIS - elapsedSinceLastRequest;
@@ -161,9 +131,10 @@ public class PtsHistoricalPriceDataDownloader implements Runnable {
       quoteHistory.setIsHistRequestCompleted(false);
 
       System.out.println("Req Hist data for. " + contract.m_symbol
-              + "-" + contract.m_expiry + " End time: " + endDateTime);
+              + "-" + contract.m_expiry + " End time: " + strEndTime);
       lastRequestTime = System.currentTimeMillis();
-      socket.reqHistoricalData(strategyId, contract, endDateTime, duration, barSize,
+      //if test for time needed then call getDurationStr
+      socket.reqHistoricalData(strategyId, contract, strEndTime, duration, barSize,
               whatToShow, useRTH, formatDate);
       //int i = 1;
     } catch (Exception ex) {
@@ -191,38 +162,25 @@ public class PtsHistoricalPriceDataDownloader implements Runnable {
     Calendar startDate = Calendar.getInstance();
     Calendar endDate = Calendar.getInstance();
     int rc = ContractInfoTable.size();
+
     for (int rownum = 0; rownum < rc; rownum++) {
-      //fcd = futuresContractDetailsList.get(ContractInfoTable.convertRowIndexToModel(rownum));
       sym = (String) ContractInfoTable.get(rownum).symbol;
       exchange = (String) ContractInfoTable.get(rownum).exchange;
       expiry = Integer.toString(ContractInfoTable.get(rownum).lastExpiry); //Integer.toString(expiration)
-      //ccdlg.DownloadWaitLabelSetText("Downloading " + sym + "-" + expiry + "....");
       contract = PtsContractFactory.makeContract(sym, "FUT", exchange, expiry, "USD");
       startDate.setTime(ContractInfoTable.get(rownum).maxDate);
+      //Date fd = startDate.getTime();
       endDate.setTime(new Date());
-//      int yr = endDate.get(Calendar.YEAR);
-//      Calendar tempcal = Calendar.getInstance();
-//      tempcal.setTime(new Date());
-//      if ((endDate.get(Calendar.YEAR) == 1900) || endDate.after(tempcal)) {
-//        endDate.setTime(new Date());
-//      }
       setupDownloader(contract, startDate, endDate, PtsBarSize.Min1);
       runContract();
     }
     int j = 3;
-    //ccdlg.DownloadWaitLabelSetText("Done");
-    //socket.disConnect();
   }
 
   @Override
   public void run() {
     try {
-//      if (ccdlg == null) {
-//        runContract();
-//        int j = 1;
-//      } else { // ccdlg is set to calling ContinuousContractDlg.
       doContinuousContractDownload();
-//      }
     } catch (Exception ex) {
       System.err.println("Exception in run: " + ex.getMessage());
     } finally {
@@ -255,15 +213,15 @@ public class PtsHistoricalPriceDataDownloader implements Runnable {
   private void download() throws InterruptedException {
     int onlyRTHPriceBars = rthOnly ? 1 : 0;
     String infoType = contract.m_exchange.equalsIgnoreCase("IDEALPRO") ? "MIDPOINT" : "TRADES";
-    Calendar cal = (Calendar) lastDate.clone();
+    Calendar calEndTime = (Calendar) lastDate.clone();
     isCancelled = false;
     SimpleDateFormat dateFormat = new SimpleDateFormat("yyyyMMdd HH:mm:ss");
-    String endTime = dateFormat.format(cal.getTime());
-    long totalMillis = cal.getTimeInMillis() - firstDate.getTimeInMillis();
-    long lastDateMillis = cal.getTimeInMillis();
+    String strEndTime = PtsDateOps.downloadFormat.format(calEndTime.getTime());
+    long totalMillis = calEndTime.getTimeInMillis() - firstDate.getTimeInMillis();
+    long lastDateMillis = calEndTime.getTimeInMillis();
     //rpc - 3/2/10 12:14 PM - This is loop for historic, get all dates for sym
-    while (cal.after(firstDate)) {
-      reqHistoricalData(tickerId, contract, endTime, barSize.getHistRequestDuration(),
+    while (calEndTime.after(firstDate)) {
+      reqHistoricalData(tickerId, contract, calEndTime, barSize.getHistRequestDuration(),
               barSize.toIBText(), infoType, onlyRTHPriceBars, 2);
       //rpc - 3/2/10 2:34 PM - Synching - HistoricalFromTWS releases guard
       setGuard();
@@ -275,8 +233,8 @@ public class PtsHistoricalPriceDataDownloader implements Runnable {
       // block of bars as the "end time" for the next historical data
       // request.
       long firstBarMillis = quoteHistory.getFirstPriceBar().getDate();
-      cal.setTimeInMillis(firstBarMillis);
-      endTime = dateFormat.format(cal.getTime());
+      calEndTime.setTimeInMillis(firstBarMillis);
+      strEndTime = dateFormat.format(calEndTime.getTime());
       // Add the just received block of bars to the cumulative set of
       // bars and clear the current block for the next request
       List<PtsPriceBar> allBars = quoteHistory.getAll();
@@ -350,5 +308,15 @@ public class PtsHistoricalPriceDataDownloader implements Runnable {
         double progress = (100 * barsWritten) / size;
       }
     }
+  }
+
+  public static void main(String[] args) {
+    DateTime dtEnd = new DateTime();
+    DateTime dtBegin = new DateTime("2011-03-24T22:58");
+    Days dbetween = Days.daysBetween(dtBegin, dtEnd);
+    Hours h = Hours.hoursBetween(dtBegin, dtEnd);
+    int days = ((h.getHours() + 23) / 24) + 1; // Auto round up, and add 1 because today counts
+    Seconds s = Seconds.secondsBetween(dtBegin, dtEnd);
+    int i = 3;
   }
 }

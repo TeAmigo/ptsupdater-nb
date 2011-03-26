@@ -1,6 +1,5 @@
 package ptsupdater;
 
-//import com.jsystemtrader.platform.util.*;
 import com.ib.client.*;
 
 public class PtsContractFactory {

@@ -24,6 +24,7 @@ public class PtsDateOps {
   public static final SimpleDateFormat strFormat = new SimpleDateFormat("MM/dd/yy hh:mm");
   public static final SimpleDateFormat fileFormat = new SimpleDateFormat("MM-dd-yyyy-HHmmss");
   public static final SimpleDateFormat dbFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+  public static final SimpleDateFormat downloadFormat = new SimpleDateFormat("yyyyMMdd HH:mm:ss");
   public static final SimpleDateFormat dbShortFormat = new SimpleDateFormat("yyyy-MM-dd");
   public static final SimpleDateFormat stdShortFormat = new SimpleDateFormat("MM/dd/yy");
 

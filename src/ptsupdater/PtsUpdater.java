@@ -25,7 +25,6 @@ public class PtsUpdater {
 
   PtsMySocket socket;
   PtsHistoricalFromTWS histFromTWS;
-
   ArrayList<SymbolMaxDateLastExpiry> symList;
 
   public ArrayList<SymbolMaxDateLastExpiry> getSymList() {
@@ -35,9 +34,6 @@ public class PtsUpdater {
   public void setSymList(ArrayList<SymbolMaxDateLastExpiry> symList) {
     this.symList = symList;
   }
-
-
-
 
   public PtsHistoricalFromTWS getHistFromTWS() {
     return histFromTWS;
@@ -55,30 +51,18 @@ public class PtsUpdater {
     this.socket = socket;
   }
 
-  
-
   public PtsUpdater() {
     histFromTWS = new PtsHistoricalFromTWS();
     socket = PtsIBConnectionManager.connect(histFromTWS);
   }
 
-
-
   private void bringSymbolsCurrent(PtsMySocket socket) {
     try {
-      //int expiry = sym.lastExpiry;
-      //Date expD = PtsDateOps.dateFromExpiryFormatString(Integer.toString(expiry));
-//      if (expD.before(new Date())) {
-//        System.err.println("Need new Expiry (" + expiry + ") is latest in DB...(in bringSymbolCurrent())");
-//        return;
-//      }
-//      Contract contract =
-//              PtsContractFactory.makeContract(sym.symbol, "FUT", sym.exchange, Integer.toString(expiry), "USD");
       Calendar startDate = Calendar.getInstance();
       Calendar endDate = Calendar.getInstance();
       endDate.setTime(new Date());
       //startDate.setTime(sym.maxDate);
-      PtsHistoricalPriceDataDownloader histDownloader = 
+      PtsHistoricalPriceDataDownloader histDownloader =
               new PtsHistoricalPriceDataDownloader(histFromTWS, socket, symList);
       histFromTWS.setMyMate(histDownloader);
       //histDownloader.setupDownloader(contract, startDate, endDate, PtsBarSize.Min1);
@@ -97,7 +81,7 @@ public class PtsUpdater {
 
   private void updateExchanges() {
     PreparedStatement pstmt = null;
-    for(int i = 0; i < symList.size(); i++) {
+    for (int i = 0; i < symList.size(); i++) {
       try {
         pstmt = PtsUpdaterDBops.exchangeBySymbolandExpiry(symList.get(i).symbol, symList.get(i).lastExpiry);
         ResultSet res = pstmt.executeQuery();
@@ -125,7 +109,7 @@ public class PtsUpdater {
     //2/4/11 1:35 PM Had a loop over symList.size(), caused that many full sets to download
     try {
 //      for (int i = 0; i < symList.size(); i++) {
-        bringSymbolsCurrent(socket);
+      bringSymbolsCurrent(socket);
 //      }
 //        sym = ;
 //        ResultSet res = PtsUpdaterDBops.minMaxDatesBySym(sym).executeQuery();
@@ -154,12 +138,12 @@ public class PtsUpdater {
     calendar.add(Calendar.DATE, -daysBefore);
     calendar.set(Calendar.HOUR, 0);
     calendar.set(Calendar.MINUTE, 0);
-    for(SymbolMaxDateLastExpiry symIn : symList) {
+    for (SymbolMaxDateLastExpiry symIn : symList) {
       symIn.maxDate = calendar.getTime();
     }
     //2/4/11 1:35 PM Had a loop over symList.size(), caused that many full sets to download
     try {
-        bringSymbolsCurrent(socket);
+      bringSymbolsCurrent(socket);
     } catch (Exception ex) {
       System.err.println("Exception in bringAllCurrent(): " + ex.getMessage());
     } finally {
@@ -169,9 +153,8 @@ public class PtsUpdater {
 
   public void createNewSymList() {
     symList = new ArrayList<SymbolMaxDateLastExpiry>();
-    
-  }
 
+  }
 
   /**
    * @param args the command line arguments
@@ -179,16 +162,15 @@ public class PtsUpdater {
   public static void main(String[] args) {
     PtsUpdater pts = new PtsUpdater();
     pts.getSocket().reqCurrentTime();
-    if(args.length == 0) {
+    if (args.length == 0) {
       pts.bringAllCurrent();
     } else if (args.length == 3) {
       pts.bringNewCurrent(Integer.parseInt(args[0]), Integer.parseInt(args[1]), Integer.parseInt(args[2]));
-    }
-    else {
+    } else {
       System.out.println("Wrong # of args ( 0 or 3 required)");
       System.out.println("0 args to update,");
       System.out.println("3 args before date of Expiry, after date of Expiry,");
-      System.out.println("and days back from today e.g. 20110400, 20110700, 7");
+        System.out.println("and days back from today e.g. 20110400, 20110700, 7");
       System.exit(1);
     }
     System.out.println("Updates Finished.");
