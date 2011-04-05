@@ -1,5 +1,6 @@
 package ptsupdater;
 
+import ptsutils.PtsContractFactory;
 import com.ib.client.*;
 import java.io.*;
 import java.sql.Connection;
@@ -11,7 +12,10 @@ import java.util.*;
 import org.joda.time.DateTime;
 import org.joda.time.Days;
 import org.joda.time.Hours;
+import org.joda.time.Minutes;
 import org.joda.time.Seconds;
+import org.joda.time.Seconds;
+import ptsutils.PtsMySocket;
 
 /**
  *
@@ -115,7 +119,8 @@ public class PtsHistoricalPriceDataDownloader implements Runnable {
     DateTime dtBegin = new DateTime(firstDate);
     Hours h = Hours.hoursBetween(dtBegin, dtEnd);
     if(h.getHours() < 24) {
-      duration = Integer.toString(h.getHours() * 3600);
+      //duration = Integer.toString(h.getHours() * 3600);
+      duration = Integer.toString(Seconds.secondsBetween(dtBegin, dtEnd).getSeconds());
     } else {
       int days = ((h.getHours() + 23) / 24) + 1;
       duration = Integer.toString(days) + " D";
@@ -311,11 +316,12 @@ public class PtsHistoricalPriceDataDownloader implements Runnable {
   }
 
   public static void main(String[] args) {
-    DateTime dtEnd = new DateTime();
+    DateTime dtEnd = new DateTime("2011-03-24T22:38");
     DateTime dtBegin = new DateTime("2011-03-24T22:58");
     Days dbetween = Days.daysBetween(dtBegin, dtEnd);
     Hours h = Hours.hoursBetween(dtBegin, dtEnd);
     int days = ((h.getHours() + 23) / 24) + 1; // Auto round up, and add 1 because today counts
+    Minutes m = Minutes.minutesBetween(dtBegin, dtEnd);
     Seconds s = Seconds.secondsBetween(dtBegin, dtEnd);
     int i = 3;
   }

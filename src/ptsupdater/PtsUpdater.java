@@ -4,18 +4,16 @@
  */
 package ptsupdater;
 
-import com.ib.client.Contract;
-import java.awt.Cursor;
+import ptsutils.PtsIBConnectionManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.swing.ListModel;
+import ptsutils.PtsMySocket;
 
 /**
  *
@@ -51,8 +49,9 @@ public class PtsUpdater {
     this.socket = socket;
   }
 
-  public PtsUpdater() {
+  public PtsUpdater(int port) {
     histFromTWS = new PtsHistoricalFromTWS();
+    PtsIBConnectionManager.setPort(port);
     socket = PtsIBConnectionManager.connect(histFromTWS);
   }
 
@@ -160,7 +159,7 @@ public class PtsUpdater {
    * @param args the command line arguments
    */
   public static void main(String[] args) {
-    PtsUpdater pts = new PtsUpdater();
+    PtsUpdater pts = new PtsUpdater(7496);
     pts.getSocket().reqCurrentTime();
     if (args.length == 0) {
       pts.bringAllCurrent();

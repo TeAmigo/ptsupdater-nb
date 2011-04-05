@@ -7,6 +7,7 @@ package ptsupdater;
 
 //import petrasys.utils.MsgBox;
 
+import ptsutils.PtsIBWrapperAdapter;
 import java.util.Date;
 import org.joda.time.DateTime;
 
