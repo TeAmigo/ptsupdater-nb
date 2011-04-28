@@ -1,8 +1,7 @@
 Readme for PtsUpdater
 =====================
-
+<2011-04-28 Thu 15:45> Added ability to take a comma delimited file as input to update new/previous contracts, 
 <2011-03-18 Fri 16:36> Added functionality to update to the currently active expiries.
-
 
 # For downloading 1-minute quote data into a Postgres database #
 Requires an Interactive Brokers account

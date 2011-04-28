@@ -1,0 +1,1 @@
+/share/ruby/petrasys/indicators1.rb

@@ -3,9 +3,14 @@
     <editor-bookmarks xmlns="http://www.netbeans.org/ns/editor-bookmarks/1">
         <file>
             <url>src/ptsupdater/PtsHistoricalPriceDataDownloader.java</url>
-            <line>112</line>
-            <line>224</line>
-            <line>320</line>
+            <line>116</line>
+            <line>174</line>
+            <line>235</line>
+            <line>331</line>
+        </file>
+        <file>
+            <url>src/ptsupdater/PtsUpdater.java</url>
+            <line>103</line>
         </file>
     </editor-bookmarks>
 </project-private>

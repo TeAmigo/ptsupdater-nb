@@ -1,5 +1,7 @@
 package ptsupdater;
 
+import ptsutils.PtsDBops;
+import ptsutils.SymbolMaxDateLastExpiry;
 import ptsutils.PtsContractFactory;
 import com.ib.client.*;
 import java.io.*;
@@ -29,6 +31,8 @@ public class PtsHistoricalPriceDataDownloader implements Runnable {
    * rpc - 3/2/10 10:59 AM See pacing violations in IB-TWS Reference
    * "Do not make more than 60 historical data requests in any ten-minute period."
    * so, 6 a minute, or every 10 seconds is ok. add 100 millis for buffer.
+   * // RPC 4/26/11 4:24 PM Am seeing pacing errors again, not sure why
+   *
    */
   private static final int MAX_REQUEST_FREQUENCY_MILLIS = 10100;
   private static final String lineSep = System.getProperty("line.separator");
@@ -52,9 +56,9 @@ public class PtsHistoricalPriceDataDownloader implements Runnable {
   ArrayList<SymbolMaxDateLastExpiry> ContractInfoTable;
 
   public PtsHistoricalPriceDataDownloader(PtsHistoricalFromTWS histFrom, PtsMySocket socket,
-          ArrayList<SymbolMaxDateLastExpiry> symList) {
+          ArrayList<SymbolMaxDateLastExpiry> ContractInfoTableIn) {
     try {
-      ContractInfoTable = symList;
+      ContractInfoTable = ContractInfoTableIn;
       quoteHistory = new PtsQuoteHistory();
       histFromTWS = histFrom;
       this.socket = socket;
@@ -123,6 +127,9 @@ public class PtsHistoricalPriceDataDownloader implements Runnable {
       duration = Integer.toString(Seconds.secondsBetween(dtBegin, dtEnd).getSeconds());
     } else {
       int days = ((h.getHours() + 23) / 24) + 1;
+      if(days > 6) {
+        days = 6;
+      }
       duration = Integer.toString(days) + " D";
     }
     //rpc - 3/2/10 8:12 AM - This is where the pacing is taken care of
@@ -171,12 +178,14 @@ public class PtsHistoricalPriceDataDownloader implements Runnable {
     for (int rownum = 0; rownum < rc; rownum++) {
       sym = (String) ContractInfoTable.get(rownum).symbol;
       exchange = (String) ContractInfoTable.get(rownum).exchange;
-      expiry = Integer.toString(ContractInfoTable.get(rownum).lastExpiry); //Integer.toString(expiration)
+      expiry = Integer.toString(ContractInfoTable.get(rownum).expiry); //Integer.toString(expiration)
       contract = PtsContractFactory.makeContract(sym, "FUT", exchange, expiry, "USD");
-      startDate.setTime(ContractInfoTable.get(rownum).maxDate);
+      startDate.setTime(ContractInfoTable.get(rownum).beginDateToDownload);
       //Date fd = startDate.getTime();
-      endDate.setTime(new Date());
+      endDate.setTime(ContractInfoTable.get(rownum).lastDateToDownload.getTime());
       setupDownloader(contract, startDate, endDate, PtsBarSize.Min1);
+      // // RPC 4/26/11 4:34 PM DEBUGGING step size violations
+      //FOR DEBUGGING: if(sym.contentEquals("EUR")){runContract();}
       runContract();
     }
     int j = 3;
@@ -219,6 +228,8 @@ public class PtsHistoricalPriceDataDownloader implements Runnable {
     int onlyRTHPriceBars = rthOnly ? 1 : 0;
     String infoType = contract.m_exchange.equalsIgnoreCase("IDEALPRO") ? "MIDPOINT" : "TRADES";
     Calendar calEndTime = (Calendar) lastDate.clone();
+    Date et = calEndTime.getTime();
+    Date fd = firstDate.getTime();
     isCancelled = false;
     SimpleDateFormat dateFormat = new SimpleDateFormat("yyyyMMdd HH:mm:ss");
     String strEndTime = PtsDateOps.downloadFormat.format(calEndTime.getTime());
@@ -264,7 +275,7 @@ public class PtsHistoricalPriceDataDownloader implements Runnable {
 
   public void setupQuotes1minConnection() {
     try {
-      quotes1minConnection = PtsUpdaterDBops.setuptradesConnection();
+      quotes1minConnection = PtsDBops.setuptradesConnection();
       stmtForQuotes = quotes1minConnection.prepareStatement(
               "INSERT INTO quotes1min VALUES (?, ? , ?, ?, ?, ?, ?, ?)");
     } catch (SQLException sqlex) {

@@ -4,6 +4,8 @@
  */
 package ptsupdater;
 
+import ptsutils.PtsDBops;
+import ptsutils.SymbolMaxDateLastExpiry;
 import ptsutils.PtsIBConnectionManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -11,9 +13,12 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.Locale;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import ptsutils.PtsMySocket;
+import org.jfree.data.time.RegularTimePeriod;
+import org.joda.time.DateTime;
 
 /**
  *
@@ -23,14 +28,14 @@ public class PtsUpdater {
 
   PtsMySocket socket;
   PtsHistoricalFromTWS histFromTWS;
-  ArrayList<SymbolMaxDateLastExpiry> symList;
+  ArrayList<SymbolMaxDateLastExpiry> ContractInfoTable;
 
-  public ArrayList<SymbolMaxDateLastExpiry> getSymList() {
-    return symList;
+  public ArrayList<SymbolMaxDateLastExpiry> getContractInfoTable() {
+    return ContractInfoTable;
   }
 
-  public void setSymList(ArrayList<SymbolMaxDateLastExpiry> symList) {
-    this.symList = symList;
+  public void setContractInfoTable(ArrayList<SymbolMaxDateLastExpiry> ContractInfoTable) {
+    this.ContractInfoTable = ContractInfoTable;
   }
 
   public PtsHistoricalFromTWS getHistFromTWS() {
@@ -57,16 +62,9 @@ public class PtsUpdater {
 
   private void bringSymbolsCurrent(PtsMySocket socket) {
     try {
-      Calendar startDate = Calendar.getInstance();
-      Calendar endDate = Calendar.getInstance();
-      endDate.setTime(new Date());
-      //startDate.setTime(sym.maxDate);
       PtsHistoricalPriceDataDownloader histDownloader =
-              new PtsHistoricalPriceDataDownloader(histFromTWS, socket, symList);
+              new PtsHistoricalPriceDataDownloader(histFromTWS, socket, ContractInfoTable);
       histFromTWS.setMyMate(histDownloader);
-      //histDownloader.setupDownloader(contract, startDate, endDate, PtsBarSize.Min1);
-      //rpc - NOTE:7/8/10 5:55 PM - Put a new dialog in here to start thread, and join it after
-      // a few seconds, and in the dialog have a box to kill the thread...
       Thread thread = new Thread(histDownloader);
       thread.setName("histDownloader");
       thread.start();
@@ -80,14 +78,14 @@ public class PtsUpdater {
 
   private void updateExchanges() {
     PreparedStatement pstmt = null;
-    for (int i = 0; i < symList.size(); i++) {
+    for (int i = 0; i < ContractInfoTable.size(); i++) {
       try {
-        pstmt = PtsUpdaterDBops.exchangeBySymbolandExpiry(symList.get(i).symbol, symList.get(i).lastExpiry);
+        pstmt = PtsDBops.exchangeBySymbolandExpiry(ContractInfoTable.get(i).symbol, ContractInfoTable.get(i).expiry);
         ResultSet res = pstmt.executeQuery();
         String exchange;
         if (res.next()) {
           exchange = res.getString(1);
-          symList.get(i).exchange = exchange;
+          ContractInfoTable.get(i).exchange = exchange;
         } else {
           System.err.println("No Exchange String returned in bringSymbolCurrent()!");
           return;
@@ -101,46 +99,32 @@ public class PtsUpdater {
 
   public void bringAllCurrent() {
     //rpc - NOTE HERE:4/13/10 6:13 PM - Is fixed, try was killing socket, had to go outside for loop
-    symList = PtsUpdaterDBops.SymbolsMaxDateLastExpiryList();
+    //ContractInfoTable = PtsDBops.SymbolsMaxDateLastExpiryList();
+    for (SymbolMaxDateLastExpiry entry : ContractInfoTable) {
+    }
     updateExchanges();
     SymbolMaxDateLastExpiry sym = null;
-
-    //2/4/11 1:35 PM Had a loop over symList.size(), caused that many full sets to download
+    // rpc - 2/4/11 1:35 PM Had a loop over ContractInfoTable.size(), caused that many full sets to download
     try {
-//      for (int i = 0; i < symList.size(); i++) {
       bringSymbolsCurrent(socket);
-//      }
-//        sym = ;
-//        ResultSet res = PtsUpdaterDBops.minMaxDatesBySym(sym).executeQuery();
-//        if (res.next()) {
-//          Timestamp maxD = res.getTimestamp(2);
-//          endDateLabel.setText(DateOps.dbFormatString(maxD));
-//        }
-//        bringSymbolCurrent(sym, socket);
-//        int j = 3;
-//      }
     } catch (Exception ex) {
       System.err.println("Exception in bringAllCurrent(): " + ex.getMessage());
     } finally {
-//      downloadWaitLabel.setText("Updating Done: " + sym + "....");
-//      setCursor(Cursor.getPredefinedCursor(Cursor.DEFAULT_CURSOR));
       socket.disConnect();
     }
   }
 
   public void bringNewCurrent(int beforeE, int AfterE, int daysBefore) {
-    //3/15/11 4:04 PM Need to get the symList differently, have it set the new syms
-    symList = PtsUpdaterDBops.SymbolsExpirysBetweemDatesList(beforeE, AfterE);
     SymbolMaxDateLastExpiry sym = null;
     Calendar calendar = Calendar.getInstance();
     calendar.setTime(new Date());
     calendar.add(Calendar.DATE, -daysBefore);
     calendar.set(Calendar.HOUR, 0);
     calendar.set(Calendar.MINUTE, 0);
-    for (SymbolMaxDateLastExpiry symIn : symList) {
-      symIn.maxDate = calendar.getTime();
+    for (SymbolMaxDateLastExpiry symIn : ContractInfoTable) {
+      symIn.beginDateToDownload = calendar.getTime();
     }
-    //2/4/11 1:35 PM Had a loop over symList.size(), caused that many full sets to download
+    //2/4/11 1:35 PM Had a loop over ContractInfoTable.size(), caused that many full sets to download
     try {
       bringSymbolsCurrent(socket);
     } catch (Exception ex) {
@@ -150,26 +134,36 @@ public class PtsUpdater {
     }
   }
 
-  public void createNewSymList() {
-    symList = new ArrayList<SymbolMaxDateLastExpiry>();
-
+  public void createNewContractInfoTable() {
+    ContractInfoTable = new ArrayList<SymbolMaxDateLastExpiry>();
   }
 
   /**
-   * @param args the command line arguments
+   * @param args either 0 or 1 - 0 updates all in db, 1 is a file to create a new ContractInfoTable
    */
   public static void main(String[] args) {
     PtsUpdater pts = new PtsUpdater(7496);
     pts.getSocket().reqCurrentTime();
     if (args.length == 0) {
+      pts.setContractInfoTable(PtsDBops.SymbolsMaxDateLastExpiryList());
+      for(SymbolMaxDateLastExpiry sym : pts.ContractInfoTable) {
+        sym.lastDateToDownload = new DateTime().toCalendar(Locale.US);
+      }
       pts.bringAllCurrent();
-    } else if (args.length == 3) {
-      pts.bringNewCurrent(Integer.parseInt(args[0]), Integer.parseInt(args[1]), Integer.parseInt(args[2]));
+    } else if (args.length == 1) {
+      // RPC 4/27/11 10:36 AM Works good for Currency futures, but not for Interest Rates futures, which need to be
+      //loaded further back, e.g., the ZF that expires 20110331,
+      //should be out after 2/27/11, and the 20110630 should be started up then
+      //pts.bringNewCurrent(Integer.parseInt(args[0]), Integer.parseInt(args[1]), Integer.parseInt(args[2]));
+      pts.setContractInfoTable(SymbolMaxDateLastExpiry.createContractInfosFromFile(args[0]));
+      pts.bringAllCurrent();
     } else {
-      System.out.println("Wrong # of args ( 0 or 3 required)");
-      System.out.println("0 args to update,");
-      System.out.println("3 args before date of Expiry, after date of Expiry,");
-        System.out.println("and days back from today e.g. 20110400, 20110700, 7");
+      System.err.println("Wrong # of args ( 0 or 3 required)");
+      System.err.println("0 args to update, 1 arg as name of input file with ContractInfoLines");
+      System.err.println("Format is symbol, expiry, exchange, beginDateTime, endDateTime");
+      System.err.println("EndDateTime can be omitted, format for dates is yyyy-MM-dd hh:mm");
+//      System.err.println("3 args before date of Expiry, after date of Expiry,");
+//      System.err.println("and days back from today e.g. 20110400, 20110700, 7");
       System.exit(1);
     }
     System.out.println("Updates Finished.");
